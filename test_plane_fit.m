@@ -3,15 +3,22 @@
 plane = orth(rand(3,2));
 plane_normal = null(plane')
 
-m = 1000;
+m = 10000;
 X = randn(m,2) * plane';
-merr = 1e-5;
-Xerr = merr * randn(m, 3);
+merr = 1e-1;
+C = [1, 1, 0.5];
+Xerr = merr * randn(m, 3) .* C;
 X = X + Xerr;
+
+disp('gTLS');
+[b, Sigma, eta2] = gTLS(X, C.^2);
+b
+diag(chol(Sigma))(1) / merr
 
 figure(33);
 scatter3(X(:,1),X(:,2),X(:,3));
 
+disp('primitive SVD');
 [U, S, V] = svd(X, 'econ');
 
 v_last = V(:,end)
@@ -24,6 +31,19 @@ e2 = U(:,end)*S(end,end);
 % S(end,end)/sqrt(m) / merr ~ 1
 
 S(end,end)/sqrt(m) / merr
+
+if (v_last(1)*plane_normal(1)<0)
+  v_last = -v_last;
+end
+if (b(1)*plane_normal(1)<0)
+  b = -b;
+end
+
+figure(3);
+plot(plane_normal, plane_normal, '-+', plane_normal, v_last, '-o', plane_normal, b, '-o');
+legend('true', 'v\_last', 'b');
+angle_gtls__ = acos(plane_normal' * b)         % should be smaller
+angle_v_last = acos(plane_normal' * v_last)
 
 figure(3525)
 plot(e1, e2, '-o')
