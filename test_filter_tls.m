@@ -1,7 +1,7 @@
 % try recover filter coefficients from noisy data
 % demo OLS can fail in large noise case
 
-m = 1e7;
+m = 1e5;
 n = 10;
 
 merr = 0.6;
@@ -12,7 +12,8 @@ randn('state', old);
 
 mdrive = 1.0;
 wb = mdrive * randn(m+2*n, 1);
-x = filter(1, [1; -a], wb);
+b_true = [1; -a];
+x = filter(1, b_true, wb);
 x = x(n+1:end);
 y = x + merr * randn(size(x,1),1);
 
@@ -60,11 +61,21 @@ a
 a_est = Z \ B   % correct for merr = 0
 a_tls = -V(2:end, end) / (V(1,end) * fact)
 
-polyfit(a, a_tls, [1 0]>0)
+coef_slope = polyfit(a, a_tls, [1 0]>0)
 
 figure(200);
 plot(a, a_est, '-o', a, a_tls, '-o', a, a, '-');
 axis([-1 1 -1 1]*0.15)
 legend('OLS', 'TLS', 'ans');
 legend('location', 'northwest');
+
+if 0
+  disp('verify gTLS:');
+  Sigma = [];
+  SNR = (mdrive/merr)^2;
+  [b, Sigma, eta2] = gTLS([B Z], Sigma, SNR);
+  diag_sqSigma = sqrt(diag(Sigma))'
+  eta2
+  bb = [b_true b [1; -a_tls]]
+end
 

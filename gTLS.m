@@ -24,7 +24,7 @@
 %   Verify model (X * b = 0), necessary condition:
 %     exam distribution of E * V(:,n) = U(:,n)*s(n).
 %     e.g. should be gaussian distributed for measurement.
-%          if not, maybe the space is curved (bended).
+%          if not, maybe the space is curved (bended), or Sigma is not correct.
 %
 % Form 2: tls_error_mode == 'OLS'
 %   Assume Z = X + E * C + [E0*eta, zeros(m,n-1)]

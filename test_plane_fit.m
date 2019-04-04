@@ -3,7 +3,7 @@
 plane = orth(rand(3,2));
 plane_normal = null(plane')
 
-m = 10000;
+m = 1000;
 X = randn(m,2) * plane';
 merr = 1e-1;
 C = [1, 1, 0.5];
@@ -13,7 +13,7 @@ X = X + Xerr;
 disp('gTLS');
 [b, Sigma, eta2] = gTLS(X, C.^2);
 b
-diag(chol(Sigma))(1) / merr
+std_err = diag(chol(Sigma))' / merr ./ C
 
 figure(33);
 scatter3(X(:,1),X(:,2),X(:,3));
