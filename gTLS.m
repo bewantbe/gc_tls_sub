@@ -4,7 +4,7 @@
 %   Z: m x n matrix, m data points, each is dimension n.
 %   Sigma: error matrix.
 %
-% Form 1: tls_error_mode == 'mu' (default)
+% Form 1: no SNR
 %   Assume Z = X + E * C
 %          where E is i.i.d measurement error (matrix size the same as X).
 %          C is error generator matrix, i.e. C'*var(E)*C is the
@@ -26,7 +26,7 @@
 %     e.g. should be gaussian distributed for measurement.
 %          if not, maybe the space is curved (bended), or Sigma is not correct.
 %
-% Form 2: tls_error_mode == 'OLS'
+% Form 2: with SNR
 %   Assume Z = X + E * C + [E0*eta, zeros(m,n-1)]
 %          where E0 and E are uncorrelated, var(E0) = var(E(:,1))
 %          known: SNR = eta^2 / (C(:,1)'*C(:,1)) = eta^2 / Sigma(1,1)
@@ -51,7 +51,6 @@ function [b, Sigma, eta2] = gTLS(Z, Sigma, SNR)
     b = 0;
     Sigma = var(Z);
   end
-  neen_correction = false;
   if m <= n
     warning('Input Z rank deficient.');
   end
@@ -70,6 +69,7 @@ function [b, Sigma, eta2] = gTLS(Z, Sigma, SNR)
   [U, S, V] = svd(Z / C, 'econ');
   sval = diag(S);
   b = C \ V(:,n);
+  neen_correction = false;  % seems no need to do this
   if neen_correction
     % Zhigang Bao, Guangming Pan and Wang Zhou (2012) Tracy-Widom law for the extreme eigenvalues of sample correlation matrices
     tw_correction = ((sqrt(n)-sqrt(m))^2 + 1.49*(sqrt(m)-sqrt(n))*(n^-0.5-m^-0.5)^(1/3))/m;
@@ -85,7 +85,7 @@ function [b, Sigma, eta2] = gTLS(Z, Sigma, SNR)
     Sigma(1,1) = Sigma(1,1) * 1/(SNR+1);
   else
     b = b / norm(b);
-    eta2 = [];
+    eta2 = 0;
   end
 end
 
