@@ -35,9 +35,9 @@ switch (is_tls>0) + 1
     
     eta2 = var(res);
   case 2
-    % higher SNR, closer to OLS.
+    % the higher SNR, the closer to OLS.
     % emprically, tune SNR so that eta2 is small
-    % because we beleve that the system is smooth.
+    % because we believe that the system is smooth.
     Sigma0 = [ones(1, od+1) 1e-12];
     [b_v  , Sigma, eta2] = gTLS([B ZE], Sigma0, SNR);
 
