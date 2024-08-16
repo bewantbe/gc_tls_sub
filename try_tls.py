@@ -1,5 +1,7 @@
 # test TLS in time series
 
+# also test singular spectrum analysis (SSA)
+
 import os
 import sys
 import numpy as np
@@ -30,7 +32,7 @@ def GenToeplitzJNP(x, od):
         X = X.at[j, :].set(x[od-j:n1+od-j])
     return X
 
-def HuangSVD(X, ext_mode = False):
+def SSA(X, ext_mode = False):
     assert X.shape[0] < X.shape[1], 'X should be a fat matrix'
     u, s, vh = svd(X, full_matrices=False)
     #print(np.linalg.norm(X - np.dot(u, np.dot(np.diag(s), vh))))
@@ -88,13 +90,13 @@ def FindTSSVD(x_orig, od):
     X = GenToeplitz(x_orig, od)
     # find a eta so that X is rank-deficient
     # eta is a JAX variable in the size of x_orig
-    init_mode = 'huang'
+    init_mode = 'ssa'
     if init_mode == 'zeros':
         eta = np.zeros_like(x_orig)
     elif init_mode == 'randn':
         eta = np.random.randn(len(x_orig))
-    elif init_mode == 'huang':
-        s, h_ts = HuangSVD(X, ext_mode=True)
+    elif init_mode == 'ssa':
+        s, h_ts = SSA(X, ext_mode=True)
         eta = s[-1] * h_ts[-1, :]
     else:
         raise ValueError('unknown init')
@@ -154,23 +156,23 @@ if __name__ == '__main__':
     x = x_orig[od:]
     X = GenToeplitz(x_orig, od)
 
-    #s, h_ts = HuangSVD(X)
+    #s, h_ts = SSA(X)
     #ShowTSComponents(x, s, h_ts)
 
     if 1:
-        s, h_ts = HuangSVD(X, ext_mode=True)
+        s, h_ts = SSA(X, ext_mode=True)
         #ShowTSComponents(x_orig, s, h_ts)
         #print(h_ts @ h_ts.T)
 
-        # test HuangSVD for rank reduction
+        # test SSA for rank reduction
         x_reduce = x_orig - s[-1] * h_ts[-1, :]
 
-        print('HuangSVD rank reduction')
+        print('SSA rank reduction')
         s_orig = svd(GenToeplitz(x_orig, od), compute_uv=False)
         print('s_orig      = ', s_orig)
 
         s = svd(GenToeplitz(x_reduce, od), compute_uv=False)
-        print('Huang svd s = ', s)
+        print('SSA s = ', s)
 
     if 1:
         eta = FindTSSVD(x_orig, od)
