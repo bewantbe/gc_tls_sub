@@ -76,7 +76,9 @@ def ShowTSComponents(x, s, h_ts):
 def TSSVDCost(X, eta, rank_weight):
     E = GenToeplitzJNP(eta, od)
     X_eta = X - E
-    l = jnp.linalg.eigvalsh(X_eta.dot(X_eta.T))
+    #l = jnp.linalg.eigvalsh(X_eta.dot(X_eta.T))
+    l = jnp.linalg.svd(X_eta, compute_uv=False)
+    l = l * l
     # minimize min(l), ideally min(l) = 0
     # for simultaneously minimize eta.T @ eta
     return jnp.sum(eta * eta) + rank_weight * jnp.min(l)
@@ -99,12 +101,12 @@ def FindTSSVD(x_orig, od):
     # use JAX to minimize the objective function
     # derivative of TSSVDCost w.r.t. eta
     d_TSSVDCost = grad(TSSVDCost, 1)
-    max_iter = 200
+    max_iter = 5000
     learning_rate = 0.0001
     rank_weight = 1000.0
     n_reheat = 4
-    reheat_ratio = 0.125
-    rank_weight_multiplier = 2.0
+    reheat_ratio = 0.1  # 0.125
+    rank_weight_multiplier = 1.0 * np.ones(n_reheat)
     log_loss = []
     log_vareta = []
     last_eta = eta
@@ -115,23 +117,28 @@ def FindTSSVD(x_orig, od):
             log_loss.append(TSSVDCost(X, eta, rank_weight))
             log_vareta.append(jnp.sum(eta*eta))
         last_eta = eta
-        rank_weight *= rank_weight_multiplier
-        learning_rate /= rank_weight_multiplier
+        rank_weight *= rank_weight_multiplier[i_reheat]
+        learning_rate /= rank_weight_multiplier[i_reheat]
         r = np.random.randn(len(x_orig))
         r = r / np.linalg.norm(r) * np.sqrt(log_vareta[-1]) * reheat_ratio
         eta = eta + r
     
-    print(f'var(eta) = {log_vareta[-1]}')
+    print(f'var(eta) = {log_vareta[-1]}, std(eta) = {np.sqrt(log_vareta[-1])}')
     print(f'loss = {log_loss[-1]}')
     print(f'eig_min_margin = {log_loss[-1] - log_vareta[-1]}')
-    print(f'eigvals_orig = {jnp.linalg.eigvalsh(X.dot(X.T))}')
+    print(f'svd_s_orig = {jnp.linalg.svd(X, compute_uv=False)}')
     E = GenToeplitzJNP(last_eta, od)
     X_eta = X - E
-    print(f'eigvals_opti = {jnp.linalg.eigvalsh(X_eta.dot(X_eta.T))}')
+    print(f'svd_s_opti = {jnp.linalg.svd(X_eta, compute_uv=False)}')
     
     plt.figure()
     plt.plot(log_loss, label='loss')
     plt.plot(log_vareta, label='vareta')
+    plt.legend()
+
+    plt.figure()
+    plt.plot(x_orig, 'b', label='original')
+    plt.plot(last_eta, 'r', label='eta')
     plt.legend()
     plt.show()
     return last_eta
@@ -139,9 +146,11 @@ def FindTSSVD(x_orig, od):
 if __name__ == '__main__':
     # fix random seed of np.randn
     np.random.seed(0)
-    n = 10
+    n = 1000
     od = 3   # fitting order
     x_orig = np.random.randn(n + od)
+    # filter x_orig by a moving average filter
+    x_orig = np.convolve(x_orig, np.ones(5)/5, mode='valid')
     x = x_orig[od:]
     X = GenToeplitz(x_orig, od)
 
@@ -168,4 +177,4 @@ if __name__ == '__main__':
         # check rank reduction
         x_reduce = x_orig - eta
         s_reduce = svd(GenToeplitz(x_reduce, od), compute_uv=False)
-        print('Opt svd     = ', s_reduce)
+        print('Opt svd    = ', s_reduce)
