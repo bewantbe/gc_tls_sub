@@ -32,14 +32,14 @@ def GenToeplitzJNP(x, od):
         X = X.at[j, :].set(x[od-j:n1+od-j])
     return X
 
-def SSA(X, ext_mode = False):
+def SSA(X, ext_mode = 'toep'):
     assert X.shape[0] < X.shape[1], 'X should be a fat matrix'
     u, s, vh = svd(X, full_matrices=False)
     #print(np.linalg.norm(X - np.dot(u, np.dot(np.diag(s), vh))))
 
     od = len(s) - 1
     n = X.shape[1]
-    if ext_mode:
+    if ext_mode == 'toep_full':
         h_ts = np.zeros((od+1, n+od))
         w = np.zeros((od + 1, n+od))
         nw = np.hstack([np.arange(1,od+1), np.ones(n-od) * (od+1), np.arange(od, 0, -1)])
@@ -48,7 +48,7 @@ def SSA(X, ext_mode = False):
             for j in range(od+1):
                 w[j, od-j:od+n-j] = u[j, k] * vh[k, :]
             h_ts[k, :] = np.sum(w, axis=0) / nw
-    else:
+    elif ext_mode == 'toep':
         h_ts = np.zeros_like(X)
         w = np.zeros((od + 1, n))
         nw = np.hstack([np.ones(n-od) * (od+1), np.arange(od, 0, -1)])
@@ -57,6 +57,8 @@ def SSA(X, ext_mode = False):
             for j in range(od+1):
                 w[j, :n-j] = u[j, k] * vh[k, j:]
             h_ts[k, :] = np.sum(w, axis=0) / nw
+    elif ext_mode == 'proj':
+        h_ts = (u[0:1,:].T * (u.T @ X)) / s[:, None]
 
     return s, h_ts
 
@@ -152,15 +154,15 @@ if __name__ == '__main__':
     od = 3   # fitting order
     x_orig = np.random.randn(n + od)
     # filter x_orig by a moving average filter
-    x_orig = np.convolve(x_orig, np.ones(5)/5, mode='valid')
+    x_orig = np.convolve(x_orig, np.ones(5)/5, mode='same')
     x = x_orig[od:]
     X = GenToeplitz(x_orig, od)
 
     #s, h_ts = SSA(X)
     #ShowTSComponents(x, s, h_ts)
 
-    if 1:
-        s, h_ts = SSA(X, ext_mode=True)
+    if 0:
+        s, h_ts = SSA(X, ext_mode='proj')
         #ShowTSComponents(x_orig, s, h_ts)
         #print(h_ts @ h_ts.T)
 
@@ -172,9 +174,24 @@ if __name__ == '__main__':
         print('s_orig      = ', s_orig)
 
         s = svd(GenToeplitz(x_reduce, od), compute_uv=False)
-        print('SSA s = ', s)
+        print('SSA s       = ', s)
 
-    if 1:
+    if 1: # non-full matrix cmp
+        s, h_ts = SSA(X, ext_mode='proj')
+        ShowTSComponents(x, s, h_ts)
+        #print(h_ts @ h_ts.T)
+
+        # test SSA for rank reduction
+        x_reduce = x - s[-1] * h_ts[-1, :]
+
+        print('SSA rank reduction')
+        s_orig = svd(GenToeplitz(x, od), compute_uv=False)
+        print('s_orig(trim) = ', s_orig)
+
+        s_ssa  = svd(GenToeplitz(x_reduce, od), compute_uv=False)
+        print('s_SSA (trim) = ', s_ssa)
+
+    if 0:
         eta = FindTSSVD(x_orig, od)
         # check rank reduction
         x_reduce = x_orig - eta
