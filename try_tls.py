@@ -4,6 +4,7 @@
 
 import os
 import sys
+from types import SimpleNamespace
 import numpy as np
 import matplotlib.pyplot as plt
 from numpy.linalg import svd
@@ -57,7 +58,7 @@ def SSA(X, ext_mode = 'toep'):
             for j in range(od+1):
                 w[j, :n-j] = u[j, k] * vh[k, j:]
             h_ts[k, :] = np.sum(w, axis=0) / nw
-    elif ext_mode == 'proj':
+    elif ext_mode == 'pca':
         h_ts = (u[0:1,:].T * (u.T @ X)) / s[:, None]
 
     return s, h_ts
@@ -98,19 +99,20 @@ def FindTSSVD(x_orig, od):
     elif init_mode == 'randn':
         eta = np.random.randn(len(x_orig))
     elif init_mode == 'ssa':
-        s, h_ts = SSA(X, ext_mode=True)
+        s, h_ts = SSA(X, ext_mode='toep_full')
         eta = s[-1] * h_ts[-1, :]
     else:
         raise ValueError('unknown init')
     # use JAX to minimize the objective function
-    # derivative of TSSVDCost w.r.t. eta
-    d_TSSVDCost = grad(TSSVDCost, 1)
-    max_iter = 5000
+    # parameters:
+    max_iter = 500
     learning_rate = 0.0001
     rank_weight = 1000.0
     n_reheat = 4
     reheat_ratio = 0.1  # 0.125
     rank_weight_multiplier = 1.0 * np.ones(n_reheat)
+    # derivative of TSSVDCost w.r.t. eta
+    d_TSSVDCost = grad(TSSVDCost, 1)
     log_loss = []
     log_vareta = []
     last_eta = eta
@@ -135,17 +137,8 @@ def FindTSSVD(x_orig, od):
     X_eta = X - E
     print(f'svd_s_opti = {jnp.linalg.svd(X_eta, compute_uv=False)}')
     
-    plt.figure()
-    plt.plot(log_loss, label='loss')
-    plt.plot(log_vareta, label='vareta')
-    plt.legend()
-
-    plt.figure()
-    plt.plot(x_orig, 'b', label='original')
-    plt.plot(last_eta, 'r', label='eta')
-    plt.legend()
-    plt.show()
-    return last_eta
+    info = SimpleNamespace(log_loss=log_loss, log_vareta=log_vareta)
+    return last_eta, info
 
 if __name__ == '__main__':
     # fix random seed of np.randn
@@ -162,8 +155,8 @@ if __name__ == '__main__':
     #ShowTSComponents(x, s, h_ts)
 
     if 0:
-        s, h_ts = SSA(X, ext_mode='proj')
-        #ShowTSComponents(x_orig, s, h_ts)
+        s, h_ts = SSA(X, ext_mode='toep_full')
+        ShowTSComponents(x_orig, s, h_ts)
         #print(h_ts @ h_ts.T)
 
         # test SSA for rank reduction
@@ -171,13 +164,13 @@ if __name__ == '__main__':
 
         print('SSA rank reduction')
         s_orig = svd(GenToeplitz(x_orig, od), compute_uv=False)
-        print('s_orig      = ', s_orig)
+        print('X_trim s_orig    = ', s_orig)
 
-        s = svd(GenToeplitz(x_reduce, od), compute_uv=False)
-        print('SSA s       = ', s)
+        s_ssa = svd(GenToeplitz(x_reduce, od), compute_uv=False)
+        print('X_trim s_SSA[-1] = ', s_ssa)
 
-    if 1: # non-full matrix cmp
-        s, h_ts = SSA(X, ext_mode='proj')
+    if 0: # non-full matrix cmp
+        s, h_ts = SSA(X, ext_mode='pca')
         ShowTSComponents(x, s, h_ts)
         #print(h_ts @ h_ts.T)
 
@@ -186,14 +179,27 @@ if __name__ == '__main__':
 
         print('SSA rank reduction')
         s_orig = svd(GenToeplitz(x, od), compute_uv=False)
-        print('s_orig(trim) = ', s_orig)
+        print('X_trim s_orig    = ', s_orig)
 
         s_ssa  = svd(GenToeplitz(x_reduce, od), compute_uv=False)
-        print('s_SSA (trim) = ', s_ssa)
+        print('X_trim s_SSA[-1] = ', s_ssa)
 
-    if 0:
-        eta = FindTSSVD(x_orig, od)
+    if 1:
+        eta, info = FindTSSVD(x_orig, od)
+    
+        plt.figure()
+        plt.plot(info.log_loss, label='loss')
+        plt.plot(info.log_vareta, label='vareta')
+        plt.legend()
+
+        plt.figure()
+        plt.plot(x_orig, 'b', label='original')
+        plt.plot(eta, 'g', label='eta')
+        plt.plot(x_orig - eta, 'r', label='residual')
+        plt.legend()
+        plt.show()
+
         # check rank reduction
         x_reduce = x_orig - eta
         s_reduce = svd(GenToeplitz(x_reduce, od), compute_uv=False)
-        print('Opt svd    = ', s_reduce)
+        print('X_trim s_opt-1 = ', s_reduce)
